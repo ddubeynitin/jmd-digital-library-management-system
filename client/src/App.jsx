@@ -5,6 +5,12 @@ import RegisterPage from './pages/auth/RegisterPage'
 import StudentDashboard from './pages/client/StudentDashboard'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import StudentAttendancePage from './pages/client/StudentAttendancePage'
+import StudentFeesPage from './pages/client/StudentFeesPage'
+import StudentProfilePage from './pages/client/StudentProfilePage'
+import LibraryViewPage from './pages/admin/LibraryViewPage'
+import TotalStudentsDetailsPage from './pages/admin/TotalStudentsDetailsPage'
+import AdminLoginPage from './pages/admin/AdminLoginPage'
+import AdminMessagePage from './pages/admin/AdminMessagePage'
 
 const App = () => {
   return (
@@ -15,7 +21,13 @@ const App = () => {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/student/dashboard" element={<StudentDashboard />} />
         <Route path="/student/attendance" element={<StudentAttendancePage/>} />
+        <Route path="/student/fees" element={<StudentFeesPage/>} />
+        <Route path="/student/profile" element={<StudentProfilePage/>} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin/dashboard" element={<AdminDashboard/>} />
+        <Route path="/admin/library-view" element={<LibraryViewPage/>} />
+        <Route path="/admin/total-students" element={<TotalStudentsDetailsPage/>} />
+        <Route path="/admin/messages" element={<AdminMessagePage/>} />
       </Routes>
     </Router>
   )
