@@ -53,6 +53,12 @@ const studentSchema = new mongoose.Schema(
       required: true,
     },
 
+    studentClass: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     address: {
       type: String,
       trim: true,

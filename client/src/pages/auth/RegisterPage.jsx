@@ -34,6 +34,7 @@ const RegisterPage = () => {
   const [generatedCredentials, setGeneratedCredentials] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api'
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -83,17 +84,41 @@ const RegisterPage = () => {
     const enrollmentId = generateStudentId(formData.fullName)
     const tempPassword = generatePassword()
 
-    setGeneratedCredentials({ enrollmentId, tempPassword })
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fullName: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+          gender: formData.gender,
+          studentClass: formData.studentClass,
+          batch: formData.batch,
+          duration: formData.duration,
+          seatNumber: formData.seatNumber,
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          studentId: enrollmentId,
+          password: tempPassword,
+        }),
+      })
 
-    // TODO: Replace this with a real API call to register the student on the server.
-    // Example:
-    // await fetch('/api/auth/register', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ ...formData, studentId: enrollmentId, password: tempPassword }),
-    // })
+      const data = await response.json()
 
-    setIsSubmitting(false)
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed')
+      }
+
+      setGeneratedCredentials({ enrollmentId, tempPassword })
+    } catch (error) {
+      setErrorMessage(error.message || 'Unable to register at this time.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
