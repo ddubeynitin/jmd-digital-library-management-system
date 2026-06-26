@@ -29,6 +29,12 @@ const studentSchema = new mongoose.Schema(
       required: true,
     },
 
+    shift: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     seatNumber: {
       type: String,
       required: true,
@@ -46,7 +52,23 @@ const studentSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    
+
+    seatAllocationStatus: {
+      type: String,
+      enum: ['pending', 'confirmed', 'rejected'],
+      default: 'pending',
+    },
+
+    seatAllocationRequestedAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    seatAllocationConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+
     gender: {
       type: String,
       enum: ["Male", "Female", "Other"],

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/student.model');
+const logActivity = require('../utils/activityLogger');
 
 const getAllStudents = async (req, res) => {
     try {
@@ -29,6 +30,15 @@ const createStudent = async (req, res) => {
         const { name, email, password } = req.body;
         const newStudent = new User({ name, email, password });
         await newStudent.save();
+        await logActivity({
+            actorType: 'admin',
+            actorName: 'System Admin',
+            activityType: 'student_create',
+            title: 'Student created',
+            description: `${newStudent.name} was created by admin.`,
+            status: 'completed',
+            metadata: { studentId: newStudent._id, email: newStudent.email },
+        });
         res.status(201).json({ message: 'Student created successfully', data: newStudent });
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -37,11 +47,31 @@ const createStudent = async (req, res) => {
 
 const updateStudent = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-        const updatedStudent = await User.findByIdAndUpdate(req.params.id, { name, email, password }, { new: true });
+        const { name, email, password, profilePicture } = req.body;
+        const updatePayload = { name, email, password };
+        if (profilePicture !== undefined) {
+            updatePayload.profilePicture = profilePicture;
+        }
+        const updatedStudent = await User.findByIdAndUpdate(req.params.id, updatePayload, { new: true });
         if (!updatedStudent) {
             return res.status(404).json({ message: 'Student not found' });
         }   
+        const activityType = profilePicture !== undefined ? 'profile_picture_update' : 'student_update';
+        await logActivity({
+            actorType: 'student',
+            actorName: updatedStudent.name,
+            actorId: updatedStudent._id,
+            activityType,
+            title: profilePicture !== undefined ? 'Profile picture updated' : 'Profile updated',
+            description: profilePicture !== undefined
+              ? `${updatedStudent.name} changed profile picture.`
+              : `${updatedStudent.name} updated profile details.`,
+            status: 'completed',
+            metadata: {
+                email: updatedStudent.email,
+                profilePictureUpdated: profilePicture !== undefined,
+            },
+        });
         res.json({message: 'Student updated successfully', data: updatedStudent});
     } catch (error) {
         res.status(500).json({ message: 'Server error' });

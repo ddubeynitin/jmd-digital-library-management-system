@@ -19,4 +19,6 @@ const feeSchema = new mongoose.Schema({
         enum: ["paid", "unpaid"],
         default: "unpaid"
     }
-});
+}, { timestamps: true });
+
+module.exports = mongoose.model("Fee", feeSchema);

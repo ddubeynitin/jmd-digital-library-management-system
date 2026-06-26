@@ -1,9 +1,64 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { MdLogout } from 'react-icons/md';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [activities, setActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(true);
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+  useEffect(() => {
+    const fetchActivities = async () => {
+      try {
+        const response = await axios.get(`${apiBaseUrl}/admin/recent-activities`, {
+          params: { limit: 8 },
+        });
+        setActivities(response.data?.data || []);
+      } catch (error) {
+        setActivities([]);
+      } finally {
+        setLoadingActivities(false);
+      }
+    };
+
+    fetchActivities();
+  }, [apiBaseUrl]);
+
+  const formatTimestamp = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return new Intl.DateTimeFormat('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(date);
+  };
+
+  const getTypeClass = (type) => {
+    const map = {
+      register: 'bg-emerald-100 text-emerald-700',
+      profile_picture_update: 'bg-purple-100 text-purple-700',
+      attendance_marked: 'bg-blue-100 text-blue-700',
+      fee_paid: 'bg-yellow-100 text-yellow-700',
+      fee_created: 'bg-amber-100 text-amber-700',
+      student_update: 'bg-slate-100 text-slate-700',
+      login: 'bg-cyan-100 text-cyan-700',
+    };
+    return map[type] || 'bg-slate-100 text-slate-700';
+  };
+
+  const getStatusClass = (status) => {
+    const map = {
+      completed: 'bg-emerald-100 text-emerald-700',
+      pending: 'bg-amber-100 text-amber-700',
+      warning: 'bg-red-100 text-red-700',
+      info: 'bg-slate-100 text-slate-700',
+    };
+    return map[status] || 'bg-slate-100 text-slate-700';
+  };
+
   return (
     <>
       <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -25,6 +80,9 @@ const AdminDashboard = () => {
                 className="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
               >
                 Message
+              </button>
+              <button onClick={() => navigate('/admin/seat-management')} className="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100">
+                Manage Seats
               </button>
               <button className="inline-flex items-center justify-center rounded-3xl bg-amber-500 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400">
                 Add New Student
@@ -138,66 +196,42 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white text-slate-700">
-                  <tr className="border-b border-slate-200">
-                    <td className="px-6 py-4 font-medium text-slate-900">Jaya D. Patel</td>
-                    <td className="px-6 py-4">Submitted Attendance</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-                        Attendance
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">Today, 2:30 PM</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Completed
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-200 bg-slate-50">
-                    <td className="px-6 py-4 font-medium text-slate-900">Rajesh Kumar</td>
-                    <td className="px-6 py-4">Fee Payment Processed</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-700">
-                        Fees
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">Today, 1:45 PM</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Completed
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="px-6 py-4 font-medium text-slate-900">Priya Sharma</td>
-                    <td className="px-6 py-4">Profile Updated</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-700">
-                        Profile
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">Today, 11:20 AM</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Completed
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="bg-slate-50">
-                    <td className="px-6 py-4 font-medium text-slate-900">Amit Desai</td>
-                    <td className="px-6 py-4">New Registration</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                        Registration
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">Yesterday, 3:15 PM</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                        Pending
-                      </span>
-                    </td>
-                  </tr>
+                  {loadingActivities ? (
+                    <tr>
+                      <td className="px-6 py-4 text-slate-500" colSpan={5}>
+                        Loading recent activity...
+                      </td>
+                    </tr>
+                  ) : activities.length === 0 ? (
+                    <tr>
+                      <td className="px-6 py-4 text-slate-500" colSpan={5}>
+                        No activity has been recorded yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    activities.map((activity, index) => (
+                      <tr
+                        key={activity._id}
+                        className={index % 2 === 1 ? 'bg-slate-50' : 'border-b border-slate-200'}
+                      >
+                        <td className="px-6 py-4 font-medium text-slate-900">
+                          {activity.actorName}
+                        </td>
+                        <td className="px-6 py-4">{activity.title}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getTypeClass(activity.activityType)}`}>
+                            {activity.activityType.replaceAll('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">{formatTimestamp(activity.createdAt)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${getStatusClass(activity.status)}`}>
+                            {activity.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

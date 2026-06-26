@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import axios from "axios";
 import {
   FiUser,
   FiMail,
@@ -9,117 +10,141 @@ import {
   FiBook,
   FiPhone,
   FiMapPin,
-  FiHash,
-  FiLayers,
-  FiCalendar,
   FiCamera,
-} from 'react-icons/fi'
+  FiAlertCircle,
+} from "react-icons/fi";
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    gender: '',
-    studentClass: '',
-    batch: '',
-    duration: '',
-    seatNumber: '',
-    address: '',
-    city: '',
-    state: '',
+    fullName: "",
+    email: "",
+    phone: "",
+    gender: "",
+    studentClass: "",
+    batch: "",
+    shift: "",
+    duration: "",
+    seatNumber: "",
+    address: "",
+    city: "",
+    state: "",
     profilePicture: null,
-  })
-  const [photoPreview, setPhotoPreview] = useState(null)
-  const [generatedCredentials, setGeneratedCredentials] = useState(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [errorMessage, setErrorMessage] = useState('')
-  const API_BASE_URL = import.meta.env.VITE_BASE_URL || 'http://localhost:5000/api'
+  });
+  const [seats, setSeats] = useState([]);
+  const [seatLoading, setSeatLoading] = useState(false);
+  const [seatError, setSeatError] = useState("");
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const API_BASE_URL =
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
   const handleChange = (event) => {
-    const { name, value } = event.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
+    const { name, value } = event.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === "batch" || name === "shift" ? { seatNumber: "" } : {}),
+    }));
+  };
 
   const handlePhotoChange = (event) => {
-    const file = event.target.files?.[0] || null
-    setFormData((prev) => ({ ...prev, profilePicture: file }))
-    setPhotoPreview(file ? URL.createObjectURL(file) : null)
-  }
-
-  const generateStudentId = (name = 'STU') => {
-    const prefix = name
-      .trim()
-      .split(' ')
-      .map((part) => part[0]?.toUpperCase() || '')
-      .slice(0, 3)
-      .join('')
-      .padEnd(3, 'X')
-    const suffix = Date.now().toString().slice(-5)
-    return `JMD-${prefix}-${suffix}`
-  }
-
-  const generatePassword = (length = 10) => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%'
-    return Array.from({ length }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('')
-  }
+    const file = event.target.files?.[0] || null;
+    setFormData((prev) => ({ ...prev, profilePicture: file }));
+    setPhotoPreview(file ? URL.createObjectURL(file) : null);
+  };
 
   const validateForm = () => {
-    const requiredFields = ['fullName', 'email', 'phone', 'gender', 'studentClass', 'batch', 'duration', 'seatNumber']
-    return requiredFields.every((field) => formData[field]?.trim())
-  }
+    const requiredFields = [
+      "fullName",
+      "email",
+      "phone",
+      "gender",
+      "studentClass",
+      "batch",
+      "shift",
+      "duration",
+    ];
+    return requiredFields.every((field) => formData[field]?.trim());
+  };
 
   const handleSubmit = async (event) => {
-    event.preventDefault()
-    setErrorMessage('')
-    setGeneratedCredentials(null)
+    event.preventDefault();
+    setErrorMessage("");
+    setRegistrationSuccess(false);
 
     if (!validateForm()) {
-      setErrorMessage('Please fill in all required fields before submitting.')
-      return
+      setErrorMessage("Please fill in all required fields before submitting.");
+      return;
     }
 
-    setIsSubmitting(true)
+    if (!formData.seatNumber) {
+      setErrorMessage("Please select an available seat before submitting.");
+      return;
+    }
 
-    const enrollmentId = generateStudentId(formData.fullName)
-    const tempPassword = generatePassword()
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
-          gender: formData.gender,
-          studentClass: formData.studentClass,
-          batch: formData.batch,
-          duration: formData.duration,
-          seatNumber: formData.seatNumber,
-          address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          studentId: enrollmentId,
-          password: tempPassword,
-        }),
-      })
+      const response = await axios.post(`${API_BASE_URL}/auth/register`, {
+        fullName: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        gender: formData.gender,
+        studentClass: formData.studentClass,
+        batch: formData.batch,
+        shift: formData.shift,
+        duration: formData.duration,
+        seatNumber: formData.seatNumber,
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+      });
+      if (response.status === 201 || response.status === 200) {
+        setRegistrationSuccess(true);
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Unable to register at this time.");
+      setRegistrationSuccess(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed')
+  useEffect(() => {
+    const fetchSeats = async () => {
+      if (!formData.batch || !formData.shift) {
+        setSeats([]);
+        return;
       }
 
-      setGeneratedCredentials({ enrollmentId, tempPassword })
-    } catch (error) {
-      setErrorMessage(error.message || 'Unable to register at this time.')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+      setSeatError("");
+      setSeatLoading(true);
+
+      try {
+        const response = await axios.get(`${API_BASE_URL}/seats`, {
+          params: { batch: formData.batch, shift: formData.shift },
+        });
+        setSeats(response.data.data || []);
+        setFormData((prev) => ({
+          ...prev,
+          seatNumber: prev.seatNumber && String(prev.seatNumber),
+        }));
+      } catch (error) {
+        setSeatError(
+          error?.response?.data?.message ||
+            error.message ||
+            "Unable to load seat data.",
+        );
+        setSeats([]);
+      } finally {
+        setSeatLoading(false);
+      }
+    };
+
+    fetchSeats();
+  }, [formData.batch, formData.shift]);
 
   return (
     <div className="min-h-screen bg-[url('images/inside-study-center.jpg')] bg-cover bg-center">
@@ -136,9 +161,12 @@ const RegisterPage = () => {
                       <FiBook className="h-5 w-5" />
                       <span className="text-sm font-semibold">JMD Library</span>
                     </div>
-                    <h1 className="mt-6 text-3xl font-bold leading-tight sm:text-4xl">Student enrollment starts here</h1>
+                    <h1 className="mt-6 text-3xl font-bold leading-tight sm:text-4xl">
+                      Student enrollment starts here
+                    </h1>
                     <p className="mt-4 text-base leading-relaxed text-white/90">
-                      Fill in your registration details and we will generate your student enrollment number and login password.
+                      Fill in your registration details and request your seat.
+                      Credentials are generated after approval.
                     </p>
                   </div>
 
@@ -149,7 +177,10 @@ const RegisterPage = () => {
                       </div>
                       <div>
                         <p className="font-semibold">One registration</p>
-                        <p className="mt-1 text-sm text-gray-300">Register once and use the same credentials for library services.</p>
+                        <p className="mt-1 text-sm text-gray-300">
+                          Register once and use the same credentials for library
+                          services.
+                        </p>
                       </div>
                     </div>
 
@@ -158,8 +189,13 @@ const RegisterPage = () => {
                         <FiCheckCircle className="h-6 w-6 text-cyan-300" />
                       </div>
                       <div>
-                        <p className="font-semibold">Automatic credentials</p>
-                        <p className="mt-1 text-sm text-gray-300">Your enrollment ID and password are generated automatically after registration.</p>
+                        <p className="font-semibold">
+                          Credentials after approval
+                        </p>
+                        <p className="mt-1 text-sm text-gray-300">
+                          Your enrollment ID and password are generated once
+                          your seat request is approved.
+                        </p>
                       </div>
                     </div>
 
@@ -169,15 +205,23 @@ const RegisterPage = () => {
                       </div>
                       <div>
                         <p className="font-semibold">Ready for login</p>
-                        <p className="mt-1 text-sm text-gray-300">Use your generated credentials to sign in immediately.</p>
+                        <p className="mt-1 text-sm text-gray-300">
+                          Use your generated credentials to sign in immediately.
+                        </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-12 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-                    <p className="text-sm text-emerald-100">Already registered?</p>
-                    <Link to="/login" className="mt-2 inline-flex items-center gap-2 font-semibold text-white transition hover:gap-3">
-                      Sign in to your account <FiArrowRight className="h-4 w-4" />
+                    <p className="text-sm text-emerald-100">
+                      Already registered?
+                    </p>
+                    <Link
+                      to="/login"
+                      className="mt-2 inline-flex items-center gap-2 font-semibold text-white transition hover:gap-3"
+                    >
+                      Sign in to your account{" "}
+                      <FiArrowRight className="h-4 w-4" />
                     </Link>
                   </div>
                 </div>
@@ -185,9 +229,12 @@ const RegisterPage = () => {
 
               <div className="p-8 sm:p-10 lg:p-16">
                 <div className="mb-10">
-                  <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Student registration form</h2>
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                    Student registration form
+                  </h2>
                   <p className="mt-3 text-slate-600">
-                    Enter your details and get your enrollment number and password right away.
+                    Enter your details to request a seat. Credentials are issued
+                    once your allocation is approved.
                   </p>
                 </div>
 
@@ -200,7 +247,10 @@ const RegisterPage = () => {
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="md:col-span-2">
-                      <label htmlFor="fullName" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="fullName"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         Full name
                       </label>
                       <div className="relative mt-3">
@@ -219,7 +269,10 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="email" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="email"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         Email address
                       </label>
                       <div className="relative mt-3">
@@ -239,7 +292,10 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="phone" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="phone"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         Phone number
                       </label>
                       <div className="relative mt-3">
@@ -258,7 +314,10 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="gender" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="gender"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         Gender
                       </label>
                       <select
@@ -277,7 +336,10 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="studentClass" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="studentClass"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         Current Study Class
                       </label>
                       <select
@@ -306,11 +368,36 @@ const RegisterPage = () => {
                       </select>
                     </div>
 
+                    <div>
+                      <label
+                        htmlFor="duration"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
+                        Duration
+                      </label>
+                      <select
+                        id="duration"
+                        name="duration"
+                        value={formData.duration}
+                        onChange={handleChange}
+                        required
+                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                      >
+                        <option value="">Select duration</option>
+                        <option value="3 months">3 months</option>
+                        <option value="6 months">6 months</option>
+                        <option value="12 months">12 months</option>
+                        <option value="24 months">24 months</option>
+                      </select>
+                    </div>
                   </div>
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <label htmlFor="profilePicture" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="profilePicture"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         Profile photo
                       </label>
                       <div className="relative mt-3">
@@ -326,8 +413,14 @@ const RegisterPage = () => {
                       </div>
                       {photoPreview ? (
                         <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                          <p className="text-sm font-semibold text-slate-900">Preview</p>
-                          <img src={photoPreview} alt="Profile preview" className="mt-3 h-28 w-28 rounded-3xl object-cover" />
+                          <p className="text-sm font-semibold text-slate-900">
+                            Preview
+                          </p>
+                          <img
+                            src={photoPreview}
+                            alt="Profile preview"
+                            className="mt-3 h-28 w-28 rounded-3xl object-cover"
+                          />
                         </div>
                       ) : null}
                     </div>
@@ -335,7 +428,10 @@ const RegisterPage = () => {
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <label htmlFor="address" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="address"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         Address
                       </label>
                       <div className="relative mt-3">
@@ -353,7 +449,10 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="city" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="city"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         City
                       </label>
                       <input
@@ -368,7 +467,10 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label htmlFor="state" className="block text-sm font-semibold text-slate-900">
+                      <label
+                        htmlFor="state"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
                         State
                       </label>
                       <input
@@ -381,45 +483,183 @@ const RegisterPage = () => {
                         placeholder="Maharashtra"
                       />
                     </div>
+
+                    <div>
+                      <label
+                        htmlFor="batch"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
+                        Batch
+                      </label>
+                      <select
+                        id="batch"
+                        name="batch"
+                        value={formData.batch}
+                        onChange={(e) => {
+                          const selectedBatch = e.target.value;
+                          setFormData((prev) => ({
+                            ...prev,
+                            batch: selectedBatch,
+                            shift:
+                              selectedBatch === "7 to 12"
+                                ? "Morning"
+                                : selectedBatch === "12 to 8"
+                                  ? "Evening"
+                                  : "",
+                            seatNumber: "",
+                          }));
+                        }}
+                        required
+                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                      >
+                        <option value="">Select batch</option>
+                        <option value="7 to 12">7 to 12</option>
+                        <option value="12 to 8">12 to 8</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="shift"
+                        className="block text-sm font-semibold text-slate-900"
+                      >
+                        Shift
+                      </label>
+                      <select
+                        id="shift"
+                        name="shift"
+                        value={formData.shift}
+                        onChange={handleChange}
+                        required
+                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                      >
+                        <option value="">Select shift</option>
+                        <option value="Morning">Morning</option>
+                        <option value="Evening">Evening</option>
+                      </select>
+                    </div>
                   </div>
+
+                  {formData.batch && formData.shift ? (
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            Choose your seat
+                          </h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            Select an available seat for the chosen batch and
+                            shift.
+                          </p>
+                        </div>
+
+                        {seatLoading ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                            Loading seats…
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1 pb-4">
+                        <div className=" rounded-full flex justify-center items-center gap-1 bg-gray-100 p-1">
+                          <FiAlertCircle className="h-4 w-4 text-emerald-500 bg-emerald-500 " />
+                          <p>open</p>
+                        </div>
+
+                        <div className=" rounded-full flex justify-center items-center gap-1 bg-gray-100 p-1">
+                          <FiAlertCircle className="h-4 w-4 text-amber-500 bg-amber-500 " />
+                          <p>Requested</p>
+                        </div>
+
+                        <div className=" rounded-full flex justify-center items-center gap-1 bg-gray-100 p-1">
+                          <FiAlertCircle className="h-4 w-4 text-red-500 bg-red-500 " />
+                          <p>Reserved</p>
+                        </div>
+                      </div>
+
+                      {seatError ? (
+                        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                          {seatError}
+                        </div>
+                      ) : null}
+
+                      <div className="grid gap-4">
+                        {seats.length === 0 && !seatLoading ? (
+                          <p className="text-sm text-slate-500">
+                            No seats are configured for this batch and shift
+                            yet.
+                          </p>
+                        ) : (
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            {seats.map((seat) => {
+                              const seatId = `${seat.batch}-${seat.shift}-${seat.seatNumber}`;
+                              const isSelected =
+                                formData.seatNumber === String(seat.seatNumber);
+                              const reserved = seat.status === "reserved";
+                              const requested = seat.status === "requested";
+                              return (
+                                <button
+                                  type="button"
+                                  key={seatId}
+                                  onClick={() =>
+                                    !reserved &&
+                                    !requested &&
+                                    setFormData((prev) => ({
+                                      ...prev,
+                                      seatNumber: String(seat.seatNumber),
+                                    }))
+                                  }
+                                  disabled={reserved || requested}
+                                  className={`rounded-3xl border p-5 text-left transition ${reserved ? "bg-red-100 text-red-700" : requested ? "bg-amber-100 text-amber-700" : isSelected ? "bg-blue-500 text-white" : "bg-emerald-100 text-emerald-700"}`}
+                                >
+                                  <div className="flex flex-col items-center justify-between gap-3">
+                                    <div className="flex gap-1">
+                                      <p className="text-lg font-semibold">
+                                        {seat.seatNumber}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
                     className="w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
-                    {isSubmitting ? 'Registering...' : 'Register and generate credentials'}
+                    {isSubmitting
+                      ? "Registering..."
+                      : "Register and request seat"}
                   </button>
                 </form>
 
-                {generatedCredentials ? (
-                  <div className="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
-                    <h3 className="text-lg font-semibold text-slate-900">Your enrollment details</h3>
+                {registrationSuccess ? (
+                  <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm">
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      Registration submitted
+                    </h3>
                     <p className="mt-2 text-sm text-slate-600">
-                      Save these credentials now. You can use them to sign in on the login page.
+                      Your seat request is pending approval. Once approved, your
+                      enrollment credentials will be sent via email or shown on
+                      the login page.
                     </p>
-
-                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-3xl bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Enrollment ID</p>
-                        <p className="mt-2 text-xl font-semibold text-slate-900">{generatedCredentials.enrollmentId}</p>
-                      </div>
-                      <div className="rounded-3xl bg-white p-5 shadow-sm">
-                        <p className="text-sm font-medium text-slate-500">Temporary password</p>
-                        <p className="mt-2 text-xl font-semibold text-slate-900">{generatedCredentials.tempPassword}</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 rounded-2xl bg-slate-900/5 p-4 text-sm text-slate-700">
-                      <p className="font-semibold">Note:</p>
-                      <p className="mt-2">Use your email address plus the generated password to sign in. Store your enrollment ID securely.</p>
-                    </div>
                   </div>
                 ) : null}
 
                 <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <p className="text-sm font-semibold text-slate-900">Already have an account?</p>
-                  <Link to="/login" className="mt-2 inline-flex items-center gap-2 font-semibold text-slate-900 transition hover:gap-3 hover:text-slate-700">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Already have an account?
+                  </p>
+                  <Link
+                    to="/login"
+                    className="mt-2 inline-flex items-center gap-2 font-semibold text-slate-900 transition hover:gap-3 hover:text-slate-700"
+                  >
                     Sign in <FiArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
@@ -429,8 +669,7 @@ const RegisterPage = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default RegisterPage
-
+export default RegisterPage;

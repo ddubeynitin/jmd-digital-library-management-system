@@ -8,6 +8,8 @@ import StudentAttendancePage from './pages/client/StudentAttendancePage'
 import StudentFeesPage from './pages/client/StudentFeesPage'
 import StudentProfilePage from './pages/client/StudentProfilePage'
 import LibraryViewPage from './pages/admin/LibraryViewPage'
+import SeatRequestsPage from './pages/admin/SeatRequestsPage'
+import SeatManagementPage from './pages/admin/SeatManagementPage'
 import TotalStudentsDetailsPage from './pages/admin/TotalStudentsDetailsPage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
 import AdminMessagePage from './pages/admin/AdminMessagePage'
@@ -26,6 +28,8 @@ const App = () => {
         <Route path="/admin/login" element={<AdminLoginPage />} />
         <Route path="/admin/dashboard" element={<AdminDashboard/>} />
         <Route path="/admin/library-view" element={<LibraryViewPage/>} />
+        <Route path="/admin/seat-requests" element={<SeatRequestsPage/>} />
+        <Route path="/admin/seat-management" element={<SeatManagementPage/>} />
         <Route path="/admin/total-students" element={<TotalStudentsDetailsPage/>} />
         <Route path="/admin/messages" element={<AdminMessagePage/>} />
       </Routes>
