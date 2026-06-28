@@ -1,20 +1,29 @@
 import React from 'react'
-import { NavLink, Link   } from "react-router-dom";
+import { NavLink, Link, useNavigate } from "react-router-dom";
+import { clearSession, getSessionUser } from '../lib/session';
 
 const SideMenuPanel = () => {
+  const user = getSessionUser();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    clearSession();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <>
          <aside className="hidden w-72 flex-col rounded-4xl border border-slate-200 bg-white p-6 shadow-2xl shadow-slate-200/30 lg:flex">
             <div className="mb-8 flex items-center gap-3 rounded-3xl bg-slate-100 p-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-slate-950 font-semibold">
-                JD
+                {user?.name?.slice(0, 2)?.toUpperCase() || 'ST'}
               </div>
               <div>
                 <p className="text-sm uppercase tracking-[0.25em] text-amber-500">
                   JMD Digital
                 </p>
                 <p className="text-lg font-semibold text-slate-900">
-                  Student Portal
+                  {user?.name || 'Student Portal'}
                 </p>
               </div>
             </div>
@@ -58,7 +67,11 @@ const SideMenuPanel = () => {
               </div>
 
               <Link
-                to="#"
+                to="/login"
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleLogout();
+                }}
                 className="inline-flex w-full items-center justify-center rounded-3xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
               >
                 Logout

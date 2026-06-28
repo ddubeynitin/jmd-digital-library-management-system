@@ -25,6 +25,18 @@ const getStudentById = async (req, res) => {
     }
 }
 
+const getStudentByStudentId = async (req, res) => {
+    try {
+        const student = await User.findOne({ studentId: req.params.studentId });
+        if (!student) {
+            return res.status(404).json({ message: 'Student not found' });
+        }
+        res.json({ message: 'Student fetch successfully', data: student });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+}
+
 const createStudent = async (req, res) => {
     try {
         const { name, email, password } = req.body;
@@ -93,6 +105,7 @@ const deleteStudent = async (req, res) => {
 module.exports = {
     getAllStudents,
     getStudentById,
+    getStudentByStudentId,
     createStudent,
     updateStudent,
     deleteStudent

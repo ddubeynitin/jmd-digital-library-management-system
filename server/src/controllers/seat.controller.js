@@ -142,6 +142,40 @@ const createSeat = async (req, res) => {
   }
 };
 
+const updateSeat = async (req, res) => {
+  try {
+    const seat = await Seat.findById(req.params.id);
+    if (!seat) {
+      return res.status(404).json({ message: 'Seat not found' });
+    }
+
+    const { status, active } = req.body;
+    if (status !== undefined) {
+      if (!['available', 'reserved', 'inactive'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid seat status' });
+      }
+      seat.status = status;
+    }
+    if (active !== undefined) {
+      seat.active = Boolean(active);
+    }
+    if (status === 'inactive' || active === false) {
+      seat.status = 'inactive';
+      seat.active = false;
+    }
+    if (status === 'available' || active === true) {
+      seat.status = 'available';
+      seat.active = true;
+    }
+
+    await seat.save();
+    res.json({ message: 'Seat updated successfully', data: seat });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 const deleteSeat = async (req, res) => {
   try {
     const seat = await Seat.findById(req.params.id);
@@ -175,5 +209,6 @@ module.exports = {
   approveSeatRequest,
   rejectSeatRequest,
   createSeat,
+  updateSeat,
   deleteSeat,
 };

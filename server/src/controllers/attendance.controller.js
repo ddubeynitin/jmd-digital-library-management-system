@@ -28,6 +28,18 @@ const getAttendanceRecordById = async (req, res) => {
   }
 };
 
+const getAttendanceByStudent = async (req, res) => {
+  try {
+    const records = await Attendance.find({ studentId: req.params.studentId })
+      .populate('studentId', 'name email studentId')
+      .populate('bookingId')
+      .sort({ createdAt: -1 });
+    res.status(200).json({ message: 'Attendance fetched successfully', data: records });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 const createAttendanceRecord = async (req, res) => {
   try {
     const { studentId, bookingId, date = new Date(), checkIn = new Date() } = req.body;
@@ -141,6 +153,7 @@ const deleteAttendanceRecord = async (req, res) => {
 module.exports = {
   getAllAttendanceRecords,
   getAttendanceRecordById,
+  getAttendanceByStudent,
   createAttendanceRecord,
   updateAttendanceRecord,
   deleteAttendanceRecord,

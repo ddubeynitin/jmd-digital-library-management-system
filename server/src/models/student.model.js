@@ -31,7 +31,7 @@ const studentSchema = new mongoose.Schema(
 
     shift: {
       type: String,
-      required: true,
+      default: null,
       trim: true,
     },
 
@@ -43,7 +43,7 @@ const studentSchema = new mongoose.Schema(
 
     batch: {
       type: String,
-      required: true,
+      default: null,
       trim: true,
     },
 
@@ -51,6 +51,18 @@ const studentSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+
+    branchId: {
+      type: String,
+      default: 'main',
+      trim: true,
+    },
+
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking',
+      default: null,
     },
 
     seatAllocationStatus: {
@@ -104,6 +116,26 @@ const studentSchema = new mongoose.Schema(
     password: {
       type: String,
       required: true,
+    },
+
+    authOtp: {
+      codeHash: {
+        type: String,
+        default: null,
+      },
+      purpose: {
+        type: String,
+        enum: ['login', 'reset_password'],
+        default: null,
+      },
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      sentTo: {
+        type: String,
+        default: null,
+      },
     },
 
     role: {

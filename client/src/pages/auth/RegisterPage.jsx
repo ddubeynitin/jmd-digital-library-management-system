@@ -14,6 +14,9 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
     fullName: "",
@@ -21,8 +24,7 @@ const RegisterPage = () => {
     phone: "",
     gender: "",
     studentClass: "",
-    batch: "",
-    shift: "",
+    branchId: "main",
     duration: "",
     seatNumber: "",
     address: "",
@@ -30,22 +32,24 @@ const RegisterPage = () => {
     state: "",
     profilePicture: null,
   });
+  const [slots, setSlots] = useState([]);
   const [seats, setSeats] = useState([]);
+  const [selectedSlotIds, setSelectedSlotIds] = useState([]);
+  const [slotLoading, setSlotLoading] = useState(false);
   const [seatLoading, setSeatLoading] = useState(false);
+  const [slotError, setSlotError] = useState("");
   const [seatError, setSeatError] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === "batch" || name === "shift" ? { seatNumber: "" } : {}),
+      ...(name === "branchId" || name === "duration" ? { seatNumber: "" } : {}),
     }));
   };
 
@@ -62,11 +66,10 @@ const RegisterPage = () => {
       "phone",
       "gender",
       "studentClass",
-      "batch",
-      "shift",
+      "branchId",
       "duration",
     ];
-    return requiredFields.every((field) => formData[field]?.trim());
+    return requiredFields.every((field) => String(formData[field] || "").trim());
   };
 
   const handleSubmit = async (event) => {
@@ -84,6 +87,11 @@ const RegisterPage = () => {
       return;
     }
 
+    if (formData.duration === "6 Hour Membership" && selectedSlotIds.length !== 1) {
+      setErrorMessage("Please choose one slot for 6 hour membership.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -93,19 +101,21 @@ const RegisterPage = () => {
         phone: formData.phone,
         gender: formData.gender,
         studentClass: formData.studentClass,
-        batch: formData.batch,
-        shift: formData.shift,
+        branchId: formData.branchId,
         duration: formData.duration,
         seatNumber: formData.seatNumber,
         address: formData.address,
         city: formData.city,
         state: formData.state,
       });
+
       if (response.status === 201 || response.status === 200) {
         setRegistrationSuccess(true);
       }
     } catch (error) {
-      setErrorMessage(error.message || "Unable to register at this time.");
+      setErrorMessage(
+        error?.response?.data?.message || error.message || "Unable to register at this time.",
+      );
       setRegistrationSuccess(false);
     } finally {
       setIsSubmitting(false);
@@ -113,8 +123,30 @@ const RegisterPage = () => {
   };
 
   useEffect(() => {
+    const fetchSlots = async () => {
+      setSlotError("");
+      setSlotLoading(true);
+      try {
+        const response = await axios.get(`${API_BASE_URL}/slots`, {
+          params: { branchId: formData.branchId },
+        });
+        setSlots(response.data.data || []);
+      } catch (error) {
+        setSlotError(
+          error?.response?.data?.message || error.message || "Unable to load slot data.",
+        );
+        setSlots([]);
+      } finally {
+        setSlotLoading(false);
+      }
+    };
+
+    fetchSlots();
+  }, [formData.branchId]);
+
+  useEffect(() => {
     const fetchSeats = async () => {
-      if (!formData.batch || !formData.shift) {
+      if (!formData.branchId) {
         setSeats([]);
         return;
       }
@@ -124,18 +156,12 @@ const RegisterPage = () => {
 
       try {
         const response = await axios.get(`${API_BASE_URL}/seats`, {
-          params: { batch: formData.batch, shift: formData.shift },
+          params: { branchId: formData.branchId },
         });
         setSeats(response.data.data || []);
-        setFormData((prev) => ({
-          ...prev,
-          seatNumber: prev.seatNumber && String(prev.seatNumber),
-        }));
       } catch (error) {
         setSeatError(
-          error?.response?.data?.message ||
-            error.message ||
-            "Unable to load seat data.",
+          error?.response?.data?.message || error.message || "Unable to load seat data.",
         );
         setSeats([]);
       } finally {
@@ -144,7 +170,17 @@ const RegisterPage = () => {
     };
 
     fetchSeats();
-  }, [formData.batch, formData.shift]);
+  }, [formData.branchId]);
+
+  useEffect(() => {
+    if (formData.duration === "12 Hour Membership") {
+      setSelectedSlotIds(slots.slice(0, 2).map((slot) => slot._id));
+    } else if (formData.duration === "6 Hour Membership") {
+      setSelectedSlotIds(slots.length > 0 ? [slots[0]._id] : []);
+    } else {
+      setSelectedSlotIds([]);
+    }
+  }, [formData.duration, slots]);
 
   return (
     <div className="min-h-screen bg-[url('images/inside-study-center.jpg')] bg-cover bg-center">
@@ -165,8 +201,7 @@ const RegisterPage = () => {
                       Student enrollment starts here
                     </h1>
                     <p className="mt-4 text-base leading-relaxed text-white/90">
-                      Fill in your registration details and request your seat.
-                      Credentials are generated after approval.
+                      Choose your membership, select a slot, and reserve an available seat.
                     </p>
                   </div>
 
@@ -178,8 +213,7 @@ const RegisterPage = () => {
                       <div>
                         <p className="font-semibold">One registration</p>
                         <p className="mt-1 text-sm text-gray-300">
-                          Register once and use the same credentials for library
-                          services.
+                          Register once and use the same credentials for library services.
                         </p>
                       </div>
                     </div>
@@ -189,39 +223,21 @@ const RegisterPage = () => {
                         <FiCheckCircle className="h-6 w-6 text-cyan-300" />
                       </div>
                       <div>
-                        <p className="font-semibold">
-                          Credentials after approval
-                        </p>
+                        <p className="font-semibold">Credentials after booking</p>
                         <p className="mt-1 text-sm text-gray-300">
-                          Your enrollment ID and password are generated once
-                          your seat request is approved.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-4">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm">
-                        <FiBook className="h-6 w-6 text-blue-300" />
-                      </div>
-                      <div>
-                        <p className="font-semibold">Ready for login</p>
-                        <p className="mt-1 text-sm text-gray-300">
-                          Use your generated credentials to sign in immediately.
+                          Your enrollment ID and password are generated after registration.
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-12 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
-                    <p className="text-sm text-emerald-100">
-                      Already registered?
-                    </p>
+                    <p className="text-sm text-emerald-100">Already registered?</p>
                     <Link
                       to="/login"
                       className="mt-2 inline-flex items-center gap-2 font-semibold text-white transition hover:gap-3"
                     >
-                      Sign in to your account{" "}
-                      <FiArrowRight className="h-4 w-4" />
+                      Sign in to your account <FiArrowRight className="h-4 w-4" />
                     </Link>
                   </div>
                 </div>
@@ -233,8 +249,7 @@ const RegisterPage = () => {
                     Student registration form
                   </h2>
                   <p className="mt-3 text-slate-600">
-                    Enter your details to request a seat. Credentials are issued
-                    once your allocation is approved.
+                    Enter your details to complete registration, choose membership, and reserve a seat.
                   </p>
                 </div>
 
@@ -247,10 +262,7 @@ const RegisterPage = () => {
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div className="md:col-span-2">
-                      <label
-                        htmlFor="fullName"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="fullName" className="block text-sm font-semibold text-slate-900">
                         Full name
                       </label>
                       <div className="relative mt-3">
@@ -269,10 +281,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label
-                        htmlFor="email"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="email" className="block text-sm font-semibold text-slate-900">
                         Email address
                       </label>
                       <div className="relative mt-3">
@@ -292,10 +301,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label
-                        htmlFor="phone"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="phone" className="block text-sm font-semibold text-slate-900">
                         Phone number
                       </label>
                       <div className="relative mt-3">
@@ -314,10 +320,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label
-                        htmlFor="gender"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="gender" className="block text-sm font-semibold text-slate-900">
                         Gender
                       </label>
                       <select
@@ -336,10 +339,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label
-                        htmlFor="studentClass"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="studentClass" className="block text-sm font-semibold text-slate-900">
                         Current Study Class
                       </label>
                       <select
@@ -369,11 +369,8 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label
-                        htmlFor="duration"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
-                        Duration
+                      <label htmlFor="duration" className="block text-sm font-semibold text-slate-900">
+                        Membership
                       </label>
                       <select
                         id="duration"
@@ -383,21 +380,31 @@ const RegisterPage = () => {
                         required
                         className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                       >
-                        <option value="">Select duration</option>
-                        <option value="3 months">3 months</option>
-                        <option value="6 months">6 months</option>
-                        <option value="12 months">12 months</option>
-                        <option value="24 months">24 months</option>
+                        <option value="">Select membership</option>
+                        <option value="6 Hour Membership">6 Hour Membership</option>
+                        <option value="12 Hour Membership">12 Hour Membership</option>
                       </select>
                     </div>
                   </div>
 
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <label
-                        htmlFor="profilePicture"
-                        className="block text-sm font-semibold text-slate-900"
+                      <label htmlFor="branchId" className="block text-sm font-semibold text-slate-900">
+                        Branch
+                      </label>
+                      <select
+                        id="branchId"
+                        name="branchId"
+                        value={formData.branchId}
+                        onChange={handleChange}
+                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                       >
+                        <option value="main">Main Branch</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="profilePicture" className="block text-sm font-semibold text-slate-900">
                         Profile photo
                       </label>
                       <div className="relative mt-3">
@@ -411,27 +418,23 @@ const RegisterPage = () => {
                           className="w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 py-3 text-slate-slate-900 outline-none transition file:mr-4 file:rounded-full file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
                         />
                       </div>
-                      {photoPreview ? (
-                        <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                          <p className="text-sm font-semibold text-slate-900">
-                            Preview
-                          </p>
-                          <img
-                            src={photoPreview}
-                            alt="Profile preview"
-                            className="mt-3 h-28 w-28 rounded-3xl object-cover"
-                          />
-                        </div>
-                      ) : null}
                     </div>
                   </div>
 
+                  {photoPreview ? (
+                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">Preview</p>
+                      <img
+                        src={photoPreview}
+                        alt="Profile preview"
+                        className="mt-3 h-28 w-28 rounded-3xl object-cover"
+                      />
+                    </div>
+                  ) : null}
+
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
-                      <label
-                        htmlFor="address"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="address" className="block text-sm font-semibold text-slate-900">
                         Address
                       </label>
                       <div className="relative mt-3">
@@ -449,10 +452,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label
-                        htmlFor="city"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="city" className="block text-sm font-semibold text-slate-900">
                         City
                       </label>
                       <input
@@ -467,10 +467,7 @@ const RegisterPage = () => {
                     </div>
 
                     <div>
-                      <label
-                        htmlFor="state"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
+                      <label htmlFor="state" className="block text-sm font-semibold text-slate-900">
                         State
                       </label>
                       <input
@@ -483,159 +480,158 @@ const RegisterPage = () => {
                         placeholder="Maharashtra"
                       />
                     </div>
-
-                    <div>
-                      <label
-                        htmlFor="batch"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
-                        Batch
-                      </label>
-                      <select
-                        id="batch"
-                        name="batch"
-                        value={formData.batch}
-                        onChange={(e) => {
-                          const selectedBatch = e.target.value;
-                          setFormData((prev) => ({
-                            ...prev,
-                            batch: selectedBatch,
-                            shift:
-                              selectedBatch === "7 to 12"
-                                ? "Morning"
-                                : selectedBatch === "12 to 8"
-                                  ? "Evening"
-                                  : "",
-                            seatNumber: "",
-                          }));
-                        }}
-                        required
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-                      >
-                        <option value="">Select batch</option>
-                        <option value="7 to 12">7 to 12</option>
-                        <option value="12 to 8">12 to 8</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label
-                        htmlFor="shift"
-                        className="block text-sm font-semibold text-slate-900"
-                      >
-                        Shift
-                      </label>
-                      <select
-                        id="shift"
-                        name="shift"
-                        value={formData.shift}
-                        onChange={handleChange}
-                        required
-                        className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
-                      >
-                        <option value="">Select shift</option>
-                        <option value="Morning">Morning</option>
-                        <option value="Evening">Evening</option>
-                      </select>
-                    </div>
                   </div>
 
-                  {formData.batch && formData.shift ? (
-                    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                      <div className="mb-4 flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-semibold text-slate-900">
-                            Choose your seat
-                          </h3>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Select an available seat for the chosen batch and
-                            shift.
-                          </p>
-                        </div>
-
-                        {seatLoading ? (
-                          <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                            Loading seats…
-                          </span>
-                        ) : null}
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Choose your slot</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {formData.duration === "12 Hour Membership"
+                            ? "12 hour membership reserves both slots automatically."
+                            : "6 hour membership lets the student pick one slot."}
+                        </p>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-1 pb-4">
-                        <div className=" rounded-full flex justify-center items-center gap-1 bg-gray-100 p-1">
-                          <FiAlertCircle className="h-4 w-4 text-emerald-500 bg-emerald-500 " />
-                          <p>open</p>
-                        </div>
-
-                        <div className=" rounded-full flex justify-center items-center gap-1 bg-gray-100 p-1">
-                          <FiAlertCircle className="h-4 w-4 text-amber-500 bg-amber-500 " />
-                          <p>Requested</p>
-                        </div>
-
-                        <div className=" rounded-full flex justify-center items-center gap-1 bg-gray-100 p-1">
-                          <FiAlertCircle className="h-4 w-4 text-red-500 bg-red-500 " />
-                          <p>Reserved</p>
-                        </div>
-                      </div>
-
-                      {seatError ? (
-                        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                          {seatError}
-                        </div>
+                      {slotLoading ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                          Loading slots...
+                        </span>
                       ) : null}
+                    </div>
 
-                      <div className="grid gap-4">
-                        {seats.length === 0 && !seatLoading ? (
-                          <p className="text-sm text-slate-500">
-                            No seats are configured for this batch and shift
-                            yet.
-                          </p>
-                        ) : (
-                          <div className="grid gap-3 sm:grid-cols-3">
-                            {seats.map((seat) => {
-                              const seatId = `${seat.batch}-${seat.shift}-${seat.seatNumber}`;
-                              const isSelected =
-                                formData.seatNumber === String(seat.seatNumber);
-                              const reserved = seat.status === "reserved";
-                              const requested = seat.status === "requested";
-                              return (
-                                <button
-                                  type="button"
-                                  key={seatId}
-                                  onClick={() =>
-                                    !reserved &&
-                                    !requested &&
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      seatNumber: String(seat.seatNumber),
-                                    }))
-                                  }
-                                  disabled={reserved || requested}
-                                  className={`rounded-3xl border p-5 text-left transition ${reserved ? "bg-red-100 text-red-700" : requested ? "bg-amber-100 text-amber-700" : isSelected ? "bg-blue-500 text-white" : "bg-emerald-100 text-emerald-700"}`}
-                                >
-                                  <div className="flex flex-col items-center justify-between gap-3">
-                                    <div className="flex gap-1">
-                                      <p className="text-lg font-semibold">
-                                        {seat.seatNumber}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
+                    {slotError ? (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {slotError}
+                      </div>
+                    ) : null}
+
+                    {!formData.duration ? (
+                      <p className="text-sm text-slate-500">Please choose membership first.</p>
+                    ) : slots.length === 0 && !slotLoading ? (
+                      <p className="text-sm text-slate-500">No active slots are configured yet.</p>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {slots.map((slot) => {
+                          const isSelected = selectedSlotIds.includes(slot._id);
+                          const locked = formData.duration === "12 Hour Membership";
+                          return (
+                            <button
+                              type="button"
+                              key={slot._id}
+                              disabled={locked}
+                              onClick={() => {
+                                if (formData.duration === "6 Hour Membership") {
+                                  setSelectedSlotIds([slot._id]);
+                                }
+                              }}
+                              className={`rounded-3xl border p-4 text-left transition ${
+                                isSelected
+                                  ? "border-slate-900 bg-slate-900 text-white"
+                                  : "border-slate-200 bg-white text-slate-900 hover:bg-slate-100"
+                              } ${locked ? "cursor-not-allowed opacity-80" : ""}`}
+                            >
+                              <p className="text-lg font-semibold">{slot.slotName}</p>
+                              <p className="mt-1 text-sm opacity-80">
+                                {slot.startTime} - {slot.endTime}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">Choose your seat</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Select an available seat for the chosen branch and membership.
+                        </p>
+                      </div>
+
+                      {seatLoading ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                          Loading seats...
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="mb-4 grid grid-cols-3 gap-2">
+                      <div className="flex items-center justify-center gap-2 rounded-full bg-gray-100 p-2 text-sm">
+                        <span className="h-3 w-3 rounded-full bg-emerald-500" />
+                        Available
+                      </div>
+                      <div className="flex items-center justify-center gap-2 rounded-full bg-gray-100 p-2 text-sm">
+                        <span className="h-3 w-3 rounded-full bg-red-500" />
+                        Reserved
+                      </div>
+                      <div className="flex items-center justify-center gap-2 rounded-full bg-gray-100 p-2 text-sm">
+                        <span className="h-3 w-3 rounded-full bg-slate-400" />
+                        Inactive
                       </div>
                     </div>
-                  ) : null}
+
+                    {seatError ? (
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        {seatError}
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-4">
+                      {seats.length === 0 && !seatLoading ? (
+                        <p className="text-sm text-slate-500">
+                          No seats are configured for this branch yet.
+                        </p>
+                      ) : (
+                        <div className="grid gap-3 sm:grid-cols-4">
+                          {seats.map((seat) => {
+                            const seatId = `${seat.branchId}-${seat.seatNumber}`;
+                            const isSelected = formData.seatNumber === String(seat.seatNumber);
+                            const reserved = seat.status === "reserved";
+                            const inactive = seat.status === "inactive" || seat.active === false;
+
+                            return (
+                              <button
+                                type="button"
+                                key={seatId}
+                                onClick={() =>
+                                  !reserved &&
+                                  !inactive &&
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    seatNumber: String(seat.seatNumber),
+                                  }))
+                                }
+                                disabled={reserved || inactive}
+                                className={`rounded-3xl border p-5 text-left transition ${
+                                  inactive
+                                    ? "bg-slate-200 text-slate-500"
+                                    : reserved
+                                      ? "bg-red-100 text-red-700"
+                                      : isSelected
+                                        ? "bg-blue-500 text-white"
+                                        : "bg-emerald-100 text-emerald-700"
+                                }`}
+                              >
+                                <div className="flex flex-col items-center justify-between gap-3">
+                                  <p className="text-lg font-semibold">{seat.seatNumber}</p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   <button
                     type="submit"
                     disabled={isSubmitting}
                     className="w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
-                    {isSubmitting
-                      ? "Registering..."
-                      : "Register and request seat"}
+                    {isSubmitting ? "Registering..." : "Register and reserve seat"}
                   </button>
                 </form>
 
@@ -645,9 +641,7 @@ const RegisterPage = () => {
                       Registration submitted
                     </h3>
                     <p className="mt-2 text-sm text-slate-600">
-                      Your seat request is pending approval. Once approved, your
-                      enrollment credentials will be sent via email or shown on
-                      the login page.
+                      Your registration has been completed. Your booking, seat and credentials are ready for login.
                     </p>
                   </div>
                 ) : null}

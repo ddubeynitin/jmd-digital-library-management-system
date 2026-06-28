@@ -12,7 +12,6 @@ import SeatRequestsPage from './pages/admin/SeatRequestsPage'
 import SeatManagementPage from './pages/admin/SeatManagementPage'
 import TotalStudentsDetailsPage from './pages/admin/TotalStudentsDetailsPage'
 import AdminLoginPage from './pages/admin/AdminLoginPage'
-import AdminMessagePage from './pages/admin/AdminMessagePage'
 
 const App = () => {
   return (
@@ -31,7 +30,6 @@ const App = () => {
         <Route path="/admin/seat-requests" element={<SeatRequestsPage/>} />
         <Route path="/admin/seat-management" element={<SeatManagementPage/>} />
         <Route path="/admin/total-students" element={<TotalStudentsDetailsPage/>} />
-        <Route path="/admin/messages" element={<AdminMessagePage/>} />
       </Routes>
     </Router>
   )
