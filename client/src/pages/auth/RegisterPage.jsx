@@ -59,6 +59,19 @@ const RegisterPage = () => {
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
   };
 
+  const fileToDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      if (!file) {
+        resolve(null);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Unable to read image file'));
+      reader.readAsDataURL(file);
+    });
+
   const validateForm = () => {
     const requiredFields = [
       "fullName",
@@ -95,6 +108,7 @@ const RegisterPage = () => {
     setIsSubmitting(true);
 
     try {
+      const profilePicture = await fileToDataUrl(formData.profilePicture);
       const response = await axios.post(`${API_BASE_URL}/auth/register`, {
         fullName: formData.fullName,
         email: formData.email,
@@ -107,6 +121,7 @@ const RegisterPage = () => {
         address: formData.address,
         city: formData.city,
         state: formData.state,
+        profilePicture,
       });
 
       if (response.status === 201 || response.status === 200) {

@@ -7,6 +7,7 @@ const Booking = require('../models/booking.model');
 const TimeSlot = require('../models/timeSlot.model');
 const logActivity = require('../utils/activityLogger');
 const { sendBrevoEmail } = require('../services/email.service');
+const { uploadToCloudinary, hasCloudinaryConfig } = require('../config/cloudinary');
 
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_PURPOSE_LOGIN = 'login';
@@ -46,6 +47,35 @@ const findStudentByIdentifier = async (identifier) => {
 };
 
 const generateOtp = () => String(crypto.randomInt(100000, 1000000));
+
+const uploadProfilePicture = async (profilePicture) => {
+  if (!profilePicture) {
+    return null;
+  }
+
+  if (typeof profilePicture === 'string' && profilePicture.startsWith('http')) {
+    return profilePicture;
+  }
+
+  if (!hasCloudinaryConfig()) {
+    throw new Error('Cloudinary configuration is missing');
+  }
+
+  const fileData =
+    typeof profilePicture === 'string'
+      ? profilePicture
+      : profilePicture?.dataUrl || profilePicture?.fileData || null;
+
+  if (!fileData) {
+    return null;
+  }
+
+  const uploadResult = await uploadToCloudinary(fileData, {
+    folder: 'jmd-digital-library/students',
+  });
+
+  return uploadResult?.secure_url || uploadResult?.url || null;
+};
 
 const sendOtpToStudent = async (student, purpose) => {
   const otp = generateOtp();
@@ -118,6 +148,7 @@ const register = async (req, res) => {
       address,
       city,
       state,
+      profilePicture,
     } = req.body;
 
     if (
@@ -155,6 +186,8 @@ const register = async (req, res) => {
       return res.status(400).json({ message: 'Selected seat is inactive' });
     }
 
+    const profilePictureUrl = await uploadProfilePicture(profilePicture);
+
     const newUser = new User({
       name: fullName,
       email,
@@ -169,6 +202,7 @@ const register = async (req, res) => {
       address,
       city,
       state,
+      profilePicture: profilePictureUrl,
     });
 
     await newUser.save();
@@ -248,11 +282,15 @@ const register = async (req, res) => {
         studentId,
         password,
         bookingId: booking._id,
+        profilePicture: profilePictureUrl,
       },
     });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Server error',
+      code: error.code || undefined,
+    });
   }
 };
 

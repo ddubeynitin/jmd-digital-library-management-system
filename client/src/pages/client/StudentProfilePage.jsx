@@ -52,9 +52,17 @@ const StudentProfilePage = () => {
             <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
               <section className="space-y-4 rounded-[32px] border border-slate-200 bg-slate-50 p-6">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-slate-900 text-4xl font-semibold text-white">
-                    {student?.name?.slice(0, 2)?.toUpperCase() || 'ST'}
-                  </div>
+                  {student?.profilePicture ? (
+                    <img
+                      src={student.profilePicture}
+                      alt={student?.name || 'Student profile'}
+                      className="h-20 w-20 rounded-[28px] object-cover ring-4 ring-white"
+                    />
+                  ) : (
+                    <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-slate-900 text-4xl font-semibold text-white">
+                      {student?.name?.slice(0, 2)?.toUpperCase() || 'ST'}
+                    </div>
+                  )}
                   <div>
                     <p className="text-sm text-slate-500">Student ID</p>
                     <p className="mt-1 text-2xl font-semibold text-slate-900">{student?.studentId || '-'}</p>

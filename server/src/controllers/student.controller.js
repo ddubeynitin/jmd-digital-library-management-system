@@ -3,6 +3,36 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/student.model');
 const logActivity = require('../utils/activityLogger');
+const { uploadToCloudinary, hasCloudinaryConfig } = require('../config/cloudinary');
+
+const uploadProfilePicture = async (profilePicture) => {
+    if (!profilePicture) {
+        return null;
+    }
+
+    if (typeof profilePicture === 'string' && profilePicture.startsWith('http')) {
+        return profilePicture;
+    }
+
+    if (!hasCloudinaryConfig()) {
+        throw new Error('Cloudinary configuration is missing');
+    }
+
+    const fileData =
+        typeof profilePicture === 'string'
+            ? profilePicture
+            : profilePicture?.dataUrl || profilePicture?.fileData || null;
+
+    if (!fileData) {
+        return null;
+    }
+
+    const uploadResult = await uploadToCloudinary(fileData, {
+        folder: 'jmd-digital-library/students',
+    });
+
+    return uploadResult?.secure_url || uploadResult?.url || null;
+};
 
 const getAllStudents = async (req, res) => {
     try {
@@ -39,8 +69,9 @@ const getStudentByStudentId = async (req, res) => {
 
 const createStudent = async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-        const newStudent = new User({ name, email, password });
+        const { name, email, password, profilePicture } = req.body;
+        const profilePictureUrl = await uploadProfilePicture(profilePicture);
+        const newStudent = new User({ name, email, password, profilePicture: profilePictureUrl });
         await newStudent.save();
         await logActivity({
             actorType: 'admin',
@@ -62,7 +93,7 @@ const updateStudent = async (req, res) => {
         const { name, email, password, profilePicture } = req.body;
         const updatePayload = { name, email, password };
         if (profilePicture !== undefined) {
-            updatePayload.profilePicture = profilePicture;
+            updatePayload.profilePicture = await uploadProfilePicture(profilePicture);
         }
         const updatedStudent = await User.findByIdAndUpdate(req.params.id, updatePayload, { new: true });
         if (!updatedStudent) {
