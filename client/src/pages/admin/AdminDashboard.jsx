@@ -3,9 +3,10 @@ import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
 import { MdLogout } from 'react-icons/md'
 import { FiSend } from 'react-icons/fi'
+import Scanner from '../../components/Scanner'
 
 const AdminDashboard = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate() 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
   const [activities, setActivities] = useState([])
   const [loadingActivities, setLoadingActivities] = useState(true)
@@ -17,6 +18,8 @@ const AdminDashboard = () => {
   })
   const [broadcast, setBroadcast] = useState({ title: '', message: '' })
   const [broadcastStatus, setBroadcastStatus] = useState('')
+  const [attendanceStatus, setAttendanceStatus] = useState('')
+  const [attendanceError, setAttendanceError] = useState('')
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -63,6 +66,44 @@ const AdminDashboard = () => {
       setBroadcastStatus('Broadcast sent successfully.')
     } catch (error) {
       setBroadcastStatus(error?.response?.data?.message || error.message || 'Unable to send broadcast.')
+    }
+  }
+
+  const handleQrScan = async (decodedText) => {
+    setAttendanceStatus('')
+    setAttendanceError('')
+    try {
+      const parsed = JSON.parse(decodedText)
+      const studentId = parsed?.studentId
+      if (!studentId) {
+        setAttendanceError('Invalid QR code: missing studentId.')
+        return
+      }
+
+      const bookingsRes = await axios.get(`${apiBaseUrl}/bookings`, {
+        params: { studentId, status: 'active' },
+      })
+
+      const bookings = bookingsRes.data?.data || bookingsRes.data || []
+      const activeBooking = Array.isArray(bookings) ? bookings[0] : null
+      if (!activeBooking) {
+        setAttendanceError('No active booking found for this student.')
+        return
+      }
+
+      const attendanceRes = await axios.post(`${apiBaseUrl}/attendance/attendance`, {
+        studentId,
+        bookingId: activeBooking._id,
+      })
+
+      const record = attendanceRes.data?.data || attendanceRes.data
+      if (record?.checkOut) {
+        setAttendanceStatus(`Check-out recorded for student ${studentId}.`)
+      } else {
+        setAttendanceStatus(`Check-in recorded for student ${studentId}.`)
+      }
+    } catch (error) {
+      setAttendanceError(error?.response?.data?.message || error.message || 'Unable to mark attendance from QR.')
     }
   }
 
@@ -233,6 +274,20 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className='mt-8'>
+          <Scanner onScan={handleQrScan} />
+          {(attendanceStatus || attendanceError) && (
+            <div className='mt-4 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/10'>
+              {attendanceStatus && (
+                <p className='text-sm text-emerald-700'>{attendanceStatus}</p>
+              )}
+              {attendanceError && (
+                <p className='text-sm text-red-700'>{attendanceError}</p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-8 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/10">
