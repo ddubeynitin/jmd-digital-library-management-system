@@ -14,16 +14,18 @@ const StudentDashboard = () => {
   const [attendance, setAttendance] = useState([])
   const [fees, setFees] = useState([])
   const [qrCode, setQrCode] = useState('')
+  const [broadcasts, setBroadcasts] = useState([])
 
   useEffect(() => {
     const load = async () => {
       if (!studentId) return
-      const [studentRes, bookingRes, attendanceRes, feesRes, qrRes] = await Promise.allSettled([
+      const [studentRes, bookingRes, attendanceRes, feesRes, qrRes, notificationsRes] = await Promise.allSettled([
         axios.get(`${API_BASE_URL}/students/student/${studentId}`),
         axios.get(`${API_BASE_URL}/bookings`),
         axios.get(`${API_BASE_URL}/attendance/attendance/student/${studentId}`),
         axios.get(`${API_BASE_URL}/fees/fees/student/${studentId}`),
         axios.get(`${API_BASE_URL}/qr/student/${studentId}`),
+        axios.get(`${API_BASE_URL}/notifications/student/${studentId}`),
       ])
 
       if (studentRes.status === 'fulfilled') setStudent(studentRes.value.data?.data || null)
@@ -34,6 +36,11 @@ const StudentDashboard = () => {
       if (attendanceRes.status === 'fulfilled') setAttendance(attendanceRes.value.data?.data || [])
       if (feesRes.status === 'fulfilled') setFees(feesRes.value.data?.data || [])
       if (qrRes.status === 'fulfilled') setQrCode(qrRes.value.data?.data?.qrCode || '')
+      if (notificationsRes.status === 'fulfilled') {
+        const notifications = notificationsRes.value.data?.data || []
+        const broadcastItems = notifications.filter((item) => item?.metadata?.broadcast)
+        setBroadcasts(broadcastItems.slice(0, 3))
+      }
     }
 
     load()
@@ -62,6 +69,46 @@ const StudentDashboard = () => {
               {booking ? `Seat #${booking.seatId?.seatNumber || '-'} · ${booking.membershipType}` : 'No active booking yet'}
             </p>
           </div>
+
+          <section className="rounded-[32px] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-6 shadow-lg shadow-amber-100/40">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.28em] text-amber-600">Broadcasts</p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-900">Latest announcements</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Messages shared by the library administration will appear here.
+                </p>
+              </div>
+              <span className="inline-flex rounded-full bg-amber-100 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-700">
+                {broadcasts.length} message{broadcasts.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
+            <div className="mt-6 grid gap-4">
+              {broadcasts.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-amber-200 bg-white/70 p-5 text-sm text-slate-500">
+                  No broadcast messages yet. Check back later for notices from the admin team.
+                </div>
+              ) : (
+                broadcasts.map((item) => (
+                  <article key={item._id} className="rounded-[24px] border border-amber-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-amber-600">
+                          {item.type || 'general'}
+                        </p>
+                        <h3 className="mt-2 text-lg font-semibold text-slate-900">{item.title}</h3>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                      </p>
+                    </div>
+                    <p className="mt-4 text-sm leading-6 text-slate-700">{item.message}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
 
           <div className="grid gap-4 sm:grid-cols-4">
             {[

@@ -254,23 +254,24 @@ const register = async (req, res) => {
     try {
       await sendBrevoEmail({
         to: { email, name: fullName },
-        subject: 'Your Study Center enrollment details',
+        subject: 'Welcome to JMD Digital Library and Study Center',
         html: `
           <div style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
-            <h2>Your registration is complete</h2>
+            <h2>Welcome to the JMD Digital Library and Study Center</h2>
             <p>Hello ${fullName},</p>
-            <p>Your enrollment details are below:</p>
+            <p>Your registration is complete. Please find your login details below:</p>
             <ul>
-              <li><strong>Enrollment No:</strong> ${studentId}</li>
-              <li><strong>Temporary Password:</strong> ${password}</li>
+              <li><strong>Enrollment ID:</strong> ${studentId}</li>
+              <li><strong>Password:</strong> ${password}</li>
               <li><strong>Seat Number:</strong> ${seat.seatNumber}</li>
               <li><strong>Branch:</strong> ${seat.branchId || 'main'}</li>
               <li><strong>Membership:</strong> ${membershipType === '12_hour' ? '12 Hour Membership' : '6 Hour Membership'}</li>
             </ul>
-            <p>Please sign in and change your password after first login.</p>
+            <p>You can now sign in with your enrollment ID or email address and this password.</p>
+            <p>Please change your password after your first login.</p>
           </div>
         `,
-        text: `Your enrollment no: ${studentId}\nTemporary password: ${password}\nSeat: ${seat.seatNumber}`,
+        text: `Welcome to the JMD Digital Library and Study Center\n\nHello ${fullName},\n\nYour registration is complete. Your login details are below:\nEnrollment ID: ${studentId}\nPassword: ${password}\nSeat Number: ${seat.seatNumber}\nBranch: ${seat.branchId || 'main'}\nMembership: ${membershipType === '12_hour' ? '12 Hour Membership' : '6 Hour Membership'}\n\nYou can sign in with your enrollment ID or email address and this password.\nPlease change your password after your first login.`,
       });
     } catch (mailError) {
       console.error('Brevo email send failed:', mailError.message);
