@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
-import { FiCamera, FiStopCircle, FiCheckCircle, FiAlertCircle } from 'react-icons/fi'
+import { FiCamera, FiStopCircle, FiCheckCircle, FiAlertCircle, FiRefreshCcw } from 'react-icons/fi'
 
 const Scanner = ({ onScan }) => {
   const [scanResult, setScanResult] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState('')
+  const [cameras, setCameras] = useState([])
+  const [selectedCameraId, setSelectedCameraId] = useState(null)
   const html5QrCodeRef = useRef(null)
   const scannerId = 'html5qr-code-full-region'
 
@@ -42,7 +44,12 @@ const Scanner = ({ onScan }) => {
         return
       }
 
-      const cameraId = devices[0].id
+      setCameras(devices)
+      if (!selectedCameraId && devices.length > 0) {
+        setSelectedCameraId(devices[0].id)
+      }
+
+      const cameraId = selectedCameraId || devices[0].id
       const config = {
         fps: 10,
         qrbox: { width: 280, height: 280 },
@@ -61,6 +68,40 @@ const Scanner = ({ onScan }) => {
     }
   }
 
+  const switchCamera = async () => {
+    if (!isScanning || cameras.length <= 1) {
+      return
+    }
+
+    try {
+      const currentIndex = cameras.findIndex(cam => cam.id === selectedCameraId)
+      const nextIndex = (currentIndex + 1) % cameras.length
+      const nextCameraId = cameras[nextIndex].id
+
+      await html5QrCodeRef.current.stop()
+      await html5QrCodeRef.current.clear()
+
+      const html5QrCode = new Html5Qrcode(scannerId)
+      html5QrCodeRef.current = html5QrCode
+
+      const config = {
+        fps: 10,
+        qrbox: { width: 280, height: 280 },
+      }
+
+      await html5QrCode.start(
+        nextCameraId,
+        config,
+        (decodedText) => handleScanSuccess(decodedText),
+      )
+
+      setSelectedCameraId(nextCameraId)
+      setError('')
+    } catch (err) {
+      setError(err?.message || 'Unable to switch camera. Please try again.')
+    }
+  }
+
   const stopScanner = async () => {
     if (!html5QrCodeRef.current) {
       setIsScanning(false)
@@ -70,13 +111,29 @@ const Scanner = ({ onScan }) => {
     try {
       await html5QrCodeRef.current.stop()
       await html5QrCodeRef.current.clear()
-    } catch (err) {
+    } catch {
       // ignore stop errors
     } finally {
       html5QrCodeRef.current = null
       setIsScanning(false)
     }
   }
+
+  useEffect(() => {
+    const initializeCameras = async () => {
+      try {
+        const devices = await Html5Qrcode.getCameras()
+        if (devices && devices.length > 0) {
+          setCameras(devices)
+          setSelectedCameraId(devices[0].id)
+        }
+      } catch (error) {
+        console.error('Failed to load cameras:', error)
+      }
+    }
+
+    initializeCameras()
+  }, [])
 
   return (
     <div className='space-y-5'>
@@ -96,14 +153,25 @@ const Scanner = ({ onScan }) => {
               Start Scan
             </button>
             {isScanning && (
-              <button
-                type='button'
-                onClick={stopScanner}
-                className='inline-flex items-center gap-2 rounded-lg border border-red-500 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50'
-              >
-                <FiStopCircle className='h-4 w-4' />
-                Stop
-              </button>
+              <>
+                <button
+                  type='button'
+                  onClick={switchCamera}
+                  disabled={cameras.length <= 1}
+                  className='inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
+                >
+                  <FiRefreshCcw className='h-4 w-4' />
+                  Switch Camera
+                </button>
+                <button
+                  type='button'
+                  onClick={stopScanner}
+                  className='inline-flex items-center gap-2 rounded-lg border border-red-500 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50'
+                >
+                  <FiStopCircle className='h-4 w-4' />
+                  Stop
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -135,6 +203,11 @@ const Scanner = ({ onScan }) => {
                 <span className='text-slate-500'>Stopped</span>
               )}
             </p>
+            {cameras.length > 1 && (
+              <p className='mt-1 text-xs text-slate-500'>
+                {cameras.findIndex(cam => cam.id === selectedCameraId) === 0 ? 'Front Camera' : 'Rear Camera'}
+              </p>
+            )}
           </div>
         </div>
       </div>
