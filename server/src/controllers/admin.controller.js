@@ -14,7 +14,43 @@ const getAdminInfo = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
-};  
+};
+
+const getDatabaseStats = async (req, res) => {
+    try {
+        const db = mongoose.connection.db;
+        if (!db) {
+            return res.status(500).json({ message: 'Database not connected' });
+        }
+
+        const collections = await db.listCollections().toArray();
+        const stats = await Promise.all(
+            collections.map(async (collection) => {
+                const collStats = await db.command({ collStats: collection.name });
+                return {
+                    name: collection.name,
+                    count: collStats.count || 0,
+                    size: collStats.size || 0,
+                };
+            })
+        );
+
+        const totalSize = stats.reduce((sum, stat) => sum + stat.size, 0);
+        const totalCount = stats.reduce((sum, stat) => sum + stat.count, 0);
+
+        res.json({
+            message: 'Database stats fetched successfully',
+            data: {
+                collections: stats,
+                totalSize,
+                totalCount,
+                totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2),
+            },
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 
 const createAdmin = async (req, res) => {
     try {
@@ -85,5 +121,6 @@ const broadcastMessage = async (req, res) => {
 module.exports = {
     getAdminInfo,
     createAdmin,
-    broadcastMessage
+    broadcastMessage,
+    getDatabaseStats
 };

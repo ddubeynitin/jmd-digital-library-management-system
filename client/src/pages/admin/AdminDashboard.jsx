@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
-import { MdLogout } from 'react-icons/md'
+import { MdLogout, MdQrCodeScanner } from 'react-icons/md'
 import { FiSend } from 'react-icons/fi'
 import Scanner from '../../components/Scanner'
 
@@ -16,10 +16,13 @@ const AdminDashboard = () => {
     availableSeats: 0,
     totalFees: 0,
   })
+  const [databaseSize, setDatabaseSize] = useState('0.00')
   const [broadcast, setBroadcast] = useState({ title: '', message: '' })
   const [broadcastStatus, setBroadcastStatus] = useState('')
   const [attendanceStatus, setAttendanceStatus] = useState('')
   const [attendanceError, setAttendanceError] = useState('')
+  const [showScanner, setShowScanner] = useState(false)
+  const [pendingAttendance, setPendingAttendance] = useState(null)
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -37,6 +40,12 @@ const AdminDashboard = () => {
         const seats = seatsRes.status === 'fulfilled' ? seatsRes.value.data?.data || [] : []
         const fees = feesRes.status === 'fulfilled' ? feesRes.value.data?.data || [] : []
 
+        const [statsRes] = await Promise.allSettled([
+          axios.get(`${apiBaseUrl}/admin/database-stats`),
+        ])
+
+        const dbStats = statsRes.status === 'fulfilled' ? statsRes.value.data?.data : null
+        setDatabaseSize(dbStats?.totalSizeMB || '0.00')
         setStats({
           totalStudents: students.length,
           reservedSeats: seats.filter((seat) => seat.status === 'reserved').length,
@@ -91,9 +100,45 @@ const AdminDashboard = () => {
         return
       }
 
-      const attendanceRes = await axios.post(`${apiBaseUrl}/attendance/attendance`, {
+      const attendanceRes = await axios.get(`${apiBaseUrl}/attendance/attendance/student/${studentId}`, {
+        params: { bookingId: activeBooking._id },
+      })
+
+      const attendanceRecords = attendanceRes.data?.data || attendanceRes.data || []
+      const todayAttendance = attendanceRecords.find((record) => {
+        const recordDate = new Date(record.date)
+        const today = new Date()
+        return (
+          recordDate.getUTCDate() === today.getUTCDate() &&
+          recordDate.getUTCMonth() === today.getUTCMonth() &&
+          recordDate.getUTCFullYear() === today.getUTCFullYear()
+        )
+      })
+
+      if (todayAttendance?.checkIn && todayAttendance?.checkOut) {
+        setAttendanceError(`Attendance already marked for student ${studentId} today (Check-in and Check-out completed).`)
+        return
+      }
+
+      setPendingAttendance({
         studentId,
         bookingId: activeBooking._id,
+        action: todayAttendance?.checkOut ? 'checkout' : 'checkin',
+      })
+    } catch (error) {
+      setAttendanceError(error?.response?.data?.message || error.message || 'Unable to process QR scan.')
+    }
+  }
+
+  const confirmAttendance = async () => {
+    if (!pendingAttendance) return
+    setAttendanceStatus('')
+    setAttendanceError('')
+    try {
+      const { studentId, bookingId } = pendingAttendance
+      const attendanceRes = await axios.post(`${apiBaseUrl}/attendance/attendance`, {
+        studentId,
+        bookingId,
       })
 
       const record = attendanceRes.data?.data || attendanceRes.data
@@ -102,9 +147,42 @@ const AdminDashboard = () => {
       } else {
         setAttendanceStatus(`Check-in recorded for student ${studentId}.`)
       }
+      setPendingAttendance(null)
+      setShowScanner(false)
     } catch (error) {
-      setAttendanceError(error?.response?.data?.message || error.message || 'Unable to mark attendance from QR.')
+      setAttendanceError(error?.response?.data?.message || error.message || 'Unable to mark attendance.')
     }
+  }
+
+  const resetScanner = () => {
+    setShowScanner(false)
+    setPendingAttendance(null)
+    setAttendanceStatus('')
+    setAttendanceError('')
+  }
+
+  const scanAgain = () => {
+    setPendingAttendance(null)
+    setAttendanceStatus('')
+    setAttendanceError('')
+    setShowScanner(true)
+  }
+
+  const refreshActivities = async () => {
+    setLoadingActivities(true)
+    try {
+      const activitiesRes = await axios.get(`${apiBaseUrl}/admin/recent-activities`, { params: { limit: 8 } })
+      setActivities(activitiesRes.data?.data || [])
+    } catch {
+      setActivities([])
+    } finally {
+      setLoadingActivities(false)
+    }
+  }
+
+  const cancelAttendance = () => {
+    setPendingAttendance(null)
+    setAttendanceError('')
   }
 
   const formatTimestamp = (value) => {
@@ -151,6 +229,13 @@ const AdminDashboard = () => {
             <h1 className="mt-2 text-4xl font-semibold text-slate-900">Dashboard</h1>
           </div>
           <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setShowScanner((prev) => !prev)}
+              className="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
+            >
+              <MdQrCodeScanner className="mr-2 h-4 w-4" />
+              {showScanner ? 'Hide Scanner' : 'Scan QR'}
+            </button>
             <button
               onClick={() => navigate('/admin/library-view')}
               className="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
@@ -199,7 +284,12 @@ const AdminDashboard = () => {
           <div className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/10 lg:col-span-2">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">Recent Activities</h2>
-              <button className="text-sm font-semibold text-amber-500 transition hover:text-amber-600">View All →</button>
+              <button 
+                onClick={refreshActivities}
+                className="text-sm font-semibold text-amber-500 transition hover:text-amber-600"
+              >
+                Refresh ↻
+              </button>
             </div>
 
             <div className="overflow-hidden rounded-[28px] border border-slate-200">
@@ -272,23 +362,80 @@ const AdminDashboard = () => {
                 <p className="text-sm text-slate-600">Broadcast Ready</p>
                 <p className="font-semibold text-slate-900">Yes</p>
               </div>
+              <div className="flex items-center justify-between rounded-3xl bg-slate-50 px-4 py-3">
+                <p className="text-sm text-slate-600">Database Size</p>
+                <p className="font-semibold text-slate-900">{databaseSize} MB</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className='mt-8'>
-          <Scanner onScan={handleQrScan} />
-          {(attendanceStatus || attendanceError) && (
-            <div className='mt-4 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/10'>
-              {attendanceStatus && (
-                <p className='text-sm text-emerald-700'>{attendanceStatus}</p>
-              )}
-              {attendanceError && (
-                <p className='text-sm text-red-700'>{attendanceError}</p>
-              )}
+        {showScanner && (
+          <div className='mt-8'>
+            <div className='mb-3 flex justify-end'>
+              <button
+                onClick={resetScanner}
+                className='inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100'
+              >
+                Reset Scanner
+              </button>
             </div>
-          )}
-        </div>
+            <Scanner onScan={handleQrScan} />
+          </div>
+        )}
+
+        {pendingAttendance && (
+          <div className='mt-8 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/10'>
+            <h3 className='text-lg font-semibold text-slate-900'>Confirm Attendance</h3>
+            <p className='mt-2 text-sm text-slate-600'>
+              Student ID: <span className='font-medium text-slate-900'>{pendingAttendance.studentId}</span>
+            </p>
+            <p className='mt-1 text-sm text-slate-600'>
+              Action: <span className='font-medium text-slate-900'>{pendingAttendance.action === 'checkin' ? 'Check-in' : 'Check-out'}</span>
+            </p>
+            <div className='mt-6 flex flex-wrap gap-3'>
+              <button
+                onClick={confirmAttendance}
+                className='inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700'
+              >
+                {pendingAttendance.action === 'checkin' ? 'Mark Check-in Attendance' : 'Mark Check-out Attendance'}
+              </button>
+              <button
+                onClick={cancelAttendance}
+                className='inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-100'
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(attendanceStatus || attendanceError) && !pendingAttendance && (
+          <div className='mt-4 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/10'>
+            {attendanceStatus && (
+              <div>
+                <p className='text-sm text-emerald-700'>{attendanceStatus}</p>
+                <button
+                  onClick={scanAgain}
+                  className='mt-3 inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700'
+                >
+                  Scan Again
+                </button>
+              </div>
+            )}
+            {attendanceError && (
+              <div>
+                <p className='text-sm text-red-700'>{attendanceError}</p>
+                <button
+                  onClick={scanAgain}
+                  className='mt-3 inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700'
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-8 rounded-[32px] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/10">
           <div className="mb-6 flex items-center justify-between">
